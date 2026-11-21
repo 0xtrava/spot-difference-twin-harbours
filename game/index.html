@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Twin Harbours — Spot the Difference</title>
+<link rel="icon" href="data:,">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1220; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; color: #e2e8f0; }
+  #app { height: 100vh; display: flex; flex-direction: column; justify-content: center; max-width: 1280px; margin: 0 auto; padding: 0 14px; }
+
+  /* ---- Top bar ---- */
+  #topbar { display: flex; align-items: baseline; justify-content: space-between; padding: 10px 4px 6px; gap: 12px; }
+  #brand { font-size: 22px; font-weight: 800; letter-spacing: 0.5px; color: #fde68a; white-space: nowrap; }
+  #brand span { color: #7dd3fc; }
+  #level-name { font-size: 17px; font-weight: 700; color: #f8fafc; text-align: center; }
+  #level-sub { font-size: 12px; color: #94a3b8; text-align: center; margin-top: 1px; }
+  #level-head { flex: 1; }
+  #hud-level { font-size: 14px; font-weight: 700; color: #cbd5e1; background: #1e293b; border: 1px solid #334155; padding: 5px 12px; border-radius: 999px; white-space: nowrap; }
+
+  /* ---- HUD ---- */
+  #hud { display: flex; align-items: center; gap: 10px; background: #111c33; border: 1px solid #24344f; border-radius: 12px; padding: 8px 12px; margin-bottom: 10px; }
+  .hud-block { display: flex; flex-direction: column; min-width: 0; }
+  .hud-label { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: #7d8aa3; }
+  .hud-value { font-size: 20px; font-weight: 800; color: #f8fafc; line-height: 1.1; }
+  #hud-found { color: #4ade80; font-size: 22px; }
+  #hud-score { color: #facc15; }
+  #hud-streak { color: #fb923c; }
+  #hud-streak.streak-hot { color: #f97316; text-shadow: 0 0 12px rgba(249,115,22,0.6); }
+  #hud-time { font-size: 22px; font-variant-numeric: tabular-nums; }
+  #hud-time.time-low { color: #f87171; }
+  #timer-wrap { flex: 1; min-width: 140px; }
+  #timer-bar { height: 10px; background: #1e293b; border-radius: 999px; overflow: hidden; margin-top: 4px; border: 1px solid #334155; }
+  #timer-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #38bdf8, #4ade80); border-radius: 999px; transition: width 0.4s linear; }
+  #timer-fill.timer-low { background: linear-gradient(90deg, #ef4444, #f97316); }
+  .hud-btn { font: inherit; font-size: 13px; font-weight: 700; color: #e2e8f0; background: #1e293b; border: 1px solid #475569; border-radius: 9px; padding: 8px 12px; cursor: pointer; white-space: nowrap; }
+  .hud-btn:hover:not(:disabled) { background: #2b3a55; border-color: #7dd3fc; }
+  .hud-btn:disabled { opacity: 0.4; cursor: default; }
+  .hud-btn.toggle-on { background: #0c4a6e; border-color: #38bdf8; color: #bae6fd; }
+
+  /* ---- Stage & panels ---- */
+  #stage { position: relative; flex: none; display: flex; gap: 12px; min-height: 0; }
+  .panel-wrap { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .panel-label { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: #94a3b8; padding: 0 4px 5px; }
+  .panel-label .tag-original { color: #7dd3fc; }
+  .panel-label .tag-changed { color: #fbbf24; }
+  .panel { flex: none; width: 100%; aspect-ratio: 5 / 3; background: #0f172a; border: 2px solid #334155; border-radius: 14px; overflow: hidden; cursor: crosshair; box-shadow: 0 8px 24px rgba(0,0,0,0.45); }
+  .panel svg { display: block; width: 100%; height: 100%; }
+  .panel:hover { border-color: #64748b; }
+
+  /* ---- Toast ---- */
+  #toast { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%) translateY(8px); background: rgba(15,23,42,0.92); border: 1px solid #4ade80; color: #bbf7d0; font-size: 14px; font-weight: 700; padding: 8px 16px; border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s; z-index: 30; white-space: nowrap; }
+  #toast.toast-show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---- Markers & animations ---- */
+  .found-mark-pop { animation: pop 0.35s ease-out; transform-box: fill-box; transform-origin: center; }
+  @keyframes pop { 0% { transform: scale(0.4); opacity: 0; } 70% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
+  .hint-ring circle { animation: hintpulse 0.9s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  @keyframes hintpulse { 0%, 100% { transform: scale(0.85); opacity: 0.5; } 50% { transform: scale(1.15); opacity: 1; } }
+  .wrong-mark { animation: wrongfade 0.75s ease-out forwards; }
+  @keyframes wrongfade { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+  /* ---- Magnifier lens ---- */
+  #lens { display: none; position: fixed; width: 220px; height: 220px; border-radius: 50%; border: 4px solid #facc15; box-shadow: 0 0 0 3px rgba(15,23,42,0.9), 0 12px 32px rgba(0,0,0,0.6); overflow: hidden; pointer-events: none; z-index: 40; background: #0f172a; }
+  #lens .lens-inner { position: absolute; top: 0; left: 0; }
+  #lens .lens-inner svg { display: block; }
+
+  /* ---- Crosshair ---- */
+  #crosshair { display: none; position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; margin: -17px 0 0 -17px; pointer-events: none; z-index: 25; }
+  #crosshair::before, #crosshair::after { content: ""; position: absolute; background: #facc15; box-shadow: 0 0 6px rgba(0,0,0,0.8); }
+  #crosshair::before { left: 16px; top: 0; width: 2px; height: 34px; }
+  #crosshair::after { top: 16px; left: 0; width: 34px; height: 2px; }
+
+  /* ---- Overlay screens ---- */
+  #overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(8, 13, 26, 0.82); backdrop-filter: blur(3px); z-index: 50; border-radius: 14px; overflow-y: auto; }
+  #overlay.hidden { display: none; }
+  #overlay-card { max-width: 760px; width: 92%; text-align: center; padding: 22px 26px; background: linear-gradient(180deg, #16233d, #0f1a30); border: 1px solid #33507a; border-radius: 18px; box-shadow: 0 20px 60px rgba(0,0,0,0.6); margin: 12px 0; }
+  .eyebrow { font-size: 12px; letter-spacing: 3px; text-transform: uppercase; color: #7dd3fc; margin: 0 0 4px; font-weight: 800; }
+  .title { font-size: 40px; margin: 0 0 6px; color: #fef3c7; letter-spacing: 0.5px; }
+  .subtitle { font-size: 15px; color: #cbd5e1; margin: 0 0 16px; }
+  .howto { display: flex; gap: 10px; margin: 0 0 10px; }
+  .howto-item { flex: 1; background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 10px; font-size: 13px; line-height: 1.45; color: #e2e8f0; }
+  .howto-item b { color: #facc15; display: block; margin-bottom: 3px; font-size: 14px; }
+  .howto-keys { font-size: 12px; color: #94a3b8; margin: 0 0 16px; }
+  .level-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+  .level-card { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; font: inherit; color: #e2e8f0; background: #1a2742; border: 1px solid #3b4d6b; border-radius: 12px; padding: 12px; cursor: pointer; }
+  .level-card:hover { border-color: #facc15; background: #223252; }
+  .level-num { font-size: 11px; font-weight: 800; letter-spacing: 2px; color: #7dd3fc; }
+  .level-title { font-size: 15px; font-weight: 800; color: #f8fafc; }
+  .level-desc { font-size: 12px; color: #94a3b8; line-height: 1.35; }
+  .level-diffs { font-size: 11px; color: #fbbf24; font-weight: 700; margin-top: 4px; }
+  .best-line { font-size: 13px; color: #94a3b8; margin: 0; }
+  .stars { font-size: 44px; letter-spacing: 8px; margin: 4px 0 8px; }
+  .star-on { color: #facc15; text-shadow: 0 0 18px rgba(250,204,21,0.7); }
+  .star-off { color: #334155; }
+  .score-line { font-size: 15px; color: #cbd5e1; margin: 4px 0 14px; }
+  .score-breakdown { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 8px 16px; margin: 0 auto 16px; max-width: 460px; }
+  .score-breakdown div { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; border-bottom: 1px solid #2b3a55; }
+  .score-breakdown div:last-child { border-bottom: none; }
+  .score-breakdown b { color: #facc15; }
+  .btn-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .btn-primary { font: inherit; font-size: 15px; font-weight: 800; color: #1a1207; background: #facc15; border: none; border-radius: 10px; padding: 12px 22px; cursor: pointer; }
+  .btn-primary:hover { background: #fde047; }
+  .btn-ghost { font: inherit; font-size: 14px; font-weight: 700; color: #e2e8f0; background: transparent; border: 1px solid #64748b; border-radius: 10px; padding: 12px 18px; cursor: pointer; }
+  .btn-ghost:hover { border-color: #facc15; color: #fde68a; }
+
+  #foot { text-align: center; font-size: 11px; color: #64748b; padding: 6px 0 8px; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div id="brand">Twin <span>Harbours</span></div>
+    <div id="level-head">
+      <div id="level-name">Dawn Harbour</div>
+      <div id="level-sub">Level 1 · Sunrise over the fishing boats</div>
+    </div>
+    <div id="hud-level">Level 1/6</div>
+  </header>
+
+  <div id="hud">
+    <div class="hud-block"><span class="hud-label">Found</span><span class="hud-value" id="hud-found">Found 0/8</span></div>
+    <div class="hud-block" id="timer-wrap"><span class="hud-label">Time left · <span id="hud-time">2:00</span></span><div id="timer-bar"><div id="timer-fill"></div></div></div>
+    <div class="hud-block"><span class="hud-label">Score</span><span class="hud-value" id="hud-score">0</span></div>
+    <div class="hud-block"><span class="hud-label">Streak</span><span class="hud-value" id="hud-streak">Streak ×0</span></div>
+    <button class="hud-btn" id="btn-hint" data-action="hint">Hint (3)</button>
+    <button class="hud-btn" id="btn-magnifier" data-action="magnifier">Magnifier: Off</button>
+    <button class="hud-btn" id="btn-pause" data-action="pause">Pause</button>
+    <button class="hud-btn" id="btn-mute" data-action="mute">Sound: On</button>
+  </div>
+
+  <div id="stage">
+    <div class="panel-wrap">
+      <div class="panel-label"><span class="tag-original">Original</span><span id="hud-found-small">0 of 8 differences found</span></div>
+      <div class="panel" id="panel-left"></div>
+    </div>
+    <div class="panel-wrap">
+      <div class="panel-label"><span class="tag-changed">Changed — spot 8 differences</span><span id="hud-scene">Dawn Harbour</span></div>
+      <div class="panel" id="panel-right"></div>
+    </div>
+    <div id="crosshair"></div>
+    <div id="toast" role="status"></div>
+    <div id="overlay"><div id="overlay-card"></div></div>
+  </div>
+
+  <div id="foot">Twin Harbours · an original spot-the-difference game · click a difference on either picture · H hint · M magnifier · P pause</div>
+</div>
+<div id="lens"><div class="lens-inner"></div></div>
+<p id="status" role="status" aria-live="polite"></p>
+<script type="module">
+  import { initGame } from './src/game.js';
+  import { attachInput } from './src/input.js';
+  attachInput();
+  initGame();
+</script>
+</body>
+</html>
