@@ -284,6 +284,16 @@ export function stageShot(name) {
   }
   hideOverlay();
   renderAll(state);
+  // Staged markers must be fully visible the instant __shotReady fires.
+  // The pop entrance animation only advances while the compositor produces
+  // frames, which an idle headless page may not do before the screenshot,
+  // so a capture can catch the markers at opacity 0 (the committed cover
+  // shipped that way while scene 3, captured later, showed them). Freeze
+  // the staged markers at their final state; real gameplay finds still
+  // animate, because renderMarkers creates fresh animated elements then.
+  document.querySelectorAll('.found-mark-pop').forEach((el) => {
+    el.style.animation = 'none';
+  });
   if (name === 'victory') showLevelCompleteScreen(state, 390);
   if (name === 'scene3') {
     // Park the magnifier over an unfound difference on the right panel.
